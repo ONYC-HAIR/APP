@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Profile Scraper</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+            margin-bottom: 2rem;
+        }
+        
+        .card-header {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .search-card {
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: white;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .search-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-completed { background-color: #28a745; color: white; }
+        .status-running { background-color: #ffc107; color: black; }
+        .status-failed { background-color: #dc3545; color: white; }
+        .status-pending { background-color: #6c757d; color: white; }
+        
+        .stats-card {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        .btn-action {
+            margin: 0 2px;
+            border-radius: 20px;
+            padding: 5px 15px;
+            font-size: 0.8rem;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            margin: 2rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="card">
+            <div class="card-header">
+                <h1 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Scraper Dashboard
+                </h1>
+                <p class="mb-0 mt-2">Monitor all your scraping sessions</p>
+            </div>
+            
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <h3 id="totalSearches">-</h3>
+                            <p class="mb-0">Total Searches</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <h3 id="totalProfiles">-</h3>
+                            <p class="mb-0">Profiles Found</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <h3 id="successRate">-</h3>
+                            <p class="mb-0">Success Rate</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4><i class="fas fa-history me-2"></i>Search History</h4>
+                    <div>
+                        <button class="btn btn-primary" onclick="refreshData()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                        <a href="/" class="btn btn-success">
+                            <i class="fas fa-plus me-1"></i>New Search
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="loading-spinner" id="loadingSpinner">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                
+                <div id="searchesContainer">
+                    <!-- Searches will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboardData();
+        });
+        
+        async function loadDashboardData() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+            
+            try {
+                const response = await fetch('/searches');
+                const searches = await response.json();
+                
+                updateStats(searches);
+                displaySearches(searches);
+                
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+                showError('Failed to load dashboard data: ' + error.message);
+            } finally {
+                document.getElementById('loadingSpinner').style.display = 'none';
+            }
+        }
+        
+        function updateStats(searches) {
+            const totalSearches = searches.length;
+            const completedSearches = searches.filter(s => s.status === 'completed');
+            const totalProfiles = completedSearches.reduce((sum, s) => sum + (s.profile_count || 0), 0);
+            const successRate = totalSearches > 0 ? Math.round((completedSearches.length / totalSearches) * 100) : 0;
+            
+            document.getElementById('totalSearches').textContent = totalSearches;
+            document.getElementById('totalProfiles').textContent = totalProfiles;
+            document.getElementById('successRate').textContent = successRate + '%';
+        }
+        
+        function displaySearches(searches) {
+            const container = document.getElementById('searchesContainer');
+            
+            if (searches.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No searches yet</h5>
+                        <p class="text-muted">Start your first search to see results here</p>
+                        <a href="/" class="btn btn-primary">Start Scraping</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            searches.forEach(search => {
+                const statusClass = `status-${search.status}`;
+                const timestamp = new Date(search.timestamp).toLocaleString();
+                const searchEngines = JSON.parse(search.search_engines || '[]');
+                
+                html += `
+                    <div class="search-card">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-2">
+                                    <i class="fas fa-key me-2"></i>
+                                    "${search.keyword}"
+                                    <span class="status-badge ${statusClass}">${search.status}</span>
+                                </h5>
+                                
+                                <div class="row text-muted small">
+                                    <div class="col-sm-6">
+                                        <i class="fas fa-clock me-1"></i>
+                                        ${timestamp}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <i class="fas fa-users me-1"></i>
+                                        ${search.profile_count || 0} profiles found
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-search me-1"></i>
+                                        Engines: ${searchEngines.join(', ')}
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4 text-end">
+                                ${search.status === 'completed' && search.profile_count > 0 ? `
+                                    <button class="btn btn-sm btn-outline-primary btn-action" onclick="viewResults(${search.id})">
+                                        <i class="fas fa-eye me-1"></i>View
+                                    </button>
+                                    <a href="/export/${search.id}" class="btn btn-sm btn-outline-success btn-action">
+                                        <i class="fas fa-download me-1"></i>Export
+                                    </a>
+                                ` : ''}
+                                
+                                ${search.status === 'failed' ? `
+                                    <button class="btn btn-sm btn-outline-warning btn-action" onclick="retrySearch('${search.keyword}')">
+                                        <i class="fas fa-redo me-1"></i>Retry
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        async function viewResults(searchId) {
+            try {
+                const response = await fetch(`/results/${searchId}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                showResultsModal(data);
+                
+            } catch (error) {
+                showError('Failed to load results: ' + error.message);
+            }
+        }
+        
+        function showResultsModal(data) {
+            const profiles = data.profiles || [];
+            
+            let modalHtml = `
+                <div class="modal fade" id="resultsModal" tabindex="-1">
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-users me-2"></i>
+                                    Search Results: "${data.search_info.keyword}"
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" style="max-height: 600px; overflow-y: auto;">
+            `;
+            
+            if (profiles.length === 0) {
+                modalHtml += '<p class="text-muted text-center">No profiles found.</p>';
+            } else {
+                profiles.forEach(profile => {
+                    const emails = profile.contacts?.email || [];
+                    const phones = profile.contacts?.phone || [];
+                    
+                    modalHtml += `
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    ${profile.name || 'Unknown Name'}
+                                    <span class="badge bg-secondary ms-2">${profile.platform || 'other'}</span>
+                                </h6>
+                                
+                                ${profile.title ? `<p class="card-text"><strong>Title:</strong> ${profile.title}</p>` : ''}
+                                ${profile.company ? `<p class="card-text"><strong>Company:</strong> ${profile.company}</p>` : ''}
+                                ${profile.location ? `<p class="card-text"><strong>Location:</strong> ${profile.location}</p>` : ''}
+                                
+                                <p class="card-text">
+                                    <a href="${profile.url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>View Profile
+                                    </a>
+                                </p>
+                                
+                                ${emails.length > 0 || phones.length > 0 ? `
+                                    <div class="mt-2">
+                                        <strong>Contact Information:</strong>
+                                        ${emails.length > 0 ? `
+                                            <div class="mt-1">
+                                                <small class="text-muted">Emails:</small>
+                                                ${emails.map(email => `<span class="badge bg-primary me-1">${email}</span>`).join('')}
+                                            </div>
+                                        ` : ''}
+                                        ${phones.length > 0 ? `
+                                            <div class="mt-1">
+                                                <small class="text-muted">Phones:</small>
+                                                ${phones.map(phone => `<span class="badge bg-success me-1">${phone}</span>`).join('')}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            modalHtml += `
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <a href="/export/${data.search_info.id}" class="btn btn-success">
+                                    <i class="fas fa-download me-1"></i>Export CSV
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('resultsModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add new modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('resultsModal'));
+            modal.show();
+        }
+        
+        function retrySearch(keyword) {
+            window.location.href = `/?keyword=${encodeURIComponent(keyword)}`;
+        }
+        
+        function refreshData() {
+            loadDashboardData();
+        }
+        
+        function showError(message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const container = document.getElementById('searchesContainer');
+            container.insertBefore(alertDiv, container.firstChild);
+        }
+    </script>
+</body>
+</html>
